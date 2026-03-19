@@ -1,526 +1,759 @@
-// geometry.hpp
-#ifndef GEOMETRY_HPP
-#define GEOMETRY_HPP
-
 #include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <vector>
 
-const double pi = 3.14159265358979323846;
+const double pi = 3.14159265;
 
 bool equal(double num_1, double num_2) {
-    return std::abs(num_1 - num_2) < 1e-9;
+    if (std::abs(num_1 - num_2) < 0.000001) {
+        return true;
+    }
+    return false;
 }
 
 int sign(double num) {
-    if (num > 0) return 1;
-    if (num < 0) return -1;
+    if (num > 0) {
+        return 1;
+    }
+    if (num < 0) {
+        return -1;
+    }
     return 0;
 }
 
 struct Point {
-    double x, y;
-    Point(double x = 0, double y = 0) : x(x), y(y) {}
-    bool operator==(const Point& other) const {
-        return equal(x, other.x) && equal(y, other.y);
+    double x;
+    double y;
+    Point(double x, double y) : x(x), y(y){};
+    bool operator==(const Point& another) const {
+        return (equal(x, another.x) && equal(y, another.y));
     }
-    bool operator!=(const Point& other) const { return !(*this == other); }
+    bool operator!=(const Point& another) const { return !(*this == another); }
 };
 
-double length(const Point& p1, const Point& p2) {
-    return std::hypot(p1.x - p2.x, p1.y - p2.y);
+double length(const Point& point_1, const Point& point_2) {
+    return sqrt(pow(point_1.x - point_2.x, 2) + pow(point_1.y - point_2.y, 2));
 }
 
-double angle(const Point& p1, const Point& p2, const Point& p3) {
-    double a = length(p1, p2);
-    double b = length(p2, p3);
-    double c = length(p1, p3);
-    return std::acos((a*a + b*b - c*c) / (2*a*b));
+double angle(const Point& point_1, const Point& point_2, const Point& point_3) {
+    double side_12 = length(point_1, point_2);
+    double side_23 = length(point_2, point_3);
+    double side_13 = length(point_1, point_3);
+    return acos((side_12 * side_12 + side_23 * side_23 - side_13 * side_13) /
+                (2 * side_12 * side_23));
 }
 
-Point mid(const Point& p1, const Point& p2) {
-    return Point((p1.x + p2.x)/2, (p1.y + p2.y)/2);
+Point mid(const Point& point_1, const Point& point_2) {
+    return Point((point_1.x + point_2.x) / 2, (point_1.y + point_2.y) / 2);
 }
 
-Point point_rotate(const Point& p, const Point& center, double angle) {
-    double dx = p.x - center.x;
-    double dy = p.y - center.y;
-    return Point(center.x + dx*std::cos(angle) - dy*std::sin(angle),
-                 center.y + dx*std::sin(angle) + dy*std::cos(angle));
+Point point_rotate(const Point& point, const Point& center, double angle) {
+    double new_x = center.x + (point.x - center.x) * cos(angle) -
+                   (point.y - center.y) * sin(angle);
+    double new_y = center.y + (point.x - center.x) * sin(angle) +
+                   (point.y - center.y) * cos(angle);
+    return Point(new_x, new_y);
 }
 
 double dot_product(double vx1, double vy1, double vx2, double vy2) {
-    return vx1*vx2 + vy1*vy2;
+    return vx1 * vx2 + vy1 * vy2;
 }
 
 class Line {
 public:
-    double A, B, C; // Ax + By + C = 0
+    double coeff_x;
+    double coeff_y;
+    double free_coeff;
 
-    Line(const Point& p1, const Point& p2)
-        : A(p2.y - p1.y), B(p1.x - p2.x), C(-p1.x*p2.y + p1.y*p2.x) {}
+    Line(const Point& point_1, const Point& point_2)
+            : coeff_x(point_2.y - point_1.y),
+              coeff_y(point_1.x - point_2.x),
+              free_coeff(-point_1.x * point_2.y + point_1.y * point_2.x) {}
 
-    Line(double k, double b) : A(k), B(-1), C(b) {} // y = kx + b
+    Line(double ang_coeff, double shift)
+            : coeff_x(ang_coeff), coeff_y(-1), free_coeff(shift){};
 
-    Line(const Point& p, double k) : A(-1), B(k), C(p.y - k*p.x) {} // через точку и угловой коэффициент
+    Line(const Point& point, double ang_coeff)
+            : coeff_x(-1),
+              coeff_y(ang_coeff),
+              free_coeff(point.y - ang_coeff * point.x) {}
+    Line(double A, double B, double C) : coeff_x(A), coeff_y(B), free_coeff(C) {}
 
-    Line(double a, double b, double c) : A(a), B(b), C(c) {}
-
-    bool operator==(const Line& other) const {
-        if (equal(A, 0) && equal(B, 0)) return false; // не линия
-        double factor = 0;
-        if (!equal(A, 0) && !equal(other.A, 0)) factor = A / other.A;
-        else if (!equal(B, 0) && !equal(other.B, 0)) factor = B / other.B;
-        else if (!equal(C, 0) && !equal(other.C, 0)) factor = C / other.C;
-        else return false;
-
-        return equal(B, other.B * factor) && equal(C, other.C * factor);
+    bool operator==(const Line& another) const {
+        if (coeff_x == 0 && free_coeff == 0) {
+            return another.coeff_x == another.free_coeff == 0;
+        } else if (coeff_y == 0 && free_coeff == 0) {
+            return another.coeff_y == another.free_coeff == 0;
+        } else if (coeff_x == 0) {
+            return equal(coeff_y / another.coeff_y,
+                         free_coeff / another.free_coeff) &&
+                   another.coeff_x == 0;
+        } else if (coeff_y == 0) {
+            return equal(coeff_x / another.coeff_x,
+                         free_coeff / another.free_coeff) &&
+                   another.coeff_y == 0;
+        } else if (free_coeff == 0) {
+            return equal(coeff_x / another.coeff_x, coeff_y / another.coeff_y) &&
+                   another.free_coeff == 0;
+        }
+        return equal(coeff_x / another.coeff_x, coeff_y / another.coeff_y) &&
+               equal(coeff_x / another.coeff_x, free_coeff / another.free_coeff);
     }
 
-    bool operator!=(const Line& other) const { return !(*this == other); }
+    bool operator!=(const Line& another) const { return !(*this == another); }
 };
 
-Point point_reflect(const Point& p, const Line& l) {
-    double d = l.A * p.x + l.B * p.y + l.C;
-    double t = -2 * d / (l.A*l.A + l.B*l.B);
-    return Point(p.x + t * l.A, p.y + t * l.B);
+Point point_reflect(const Point& point, const Line& line) {
+    double new_x =
+            point.x -
+            2 * line.coeff_x *
+            (line.coeff_x * point.x + line.coeff_y * point.y + line.free_coeff) /
+            (line.coeff_x * line.coeff_x + line.coeff_y * line.coeff_y);
+    double new_y =
+            point.y -
+            2 * line.coeff_y *
+            (line.coeff_x * point.x + line.coeff_y * point.y + line.free_coeff) /
+            (line.coeff_x * line.coeff_x + line.coeff_y * line.coeff_y);
+    return Point(new_x, new_y);
 }
 
-Point intersection(const Line& l1, const Line& l2) {
-    double det = l1.A * l2.B - l2.A * l1.B;
-    if (equal(det, 0)) throw std::runtime_error("Lines are parallel");
-    double x = (l1.B * l2.C - l2.B * l1.C) / det;
-    double y = (l2.A * l1.C - l1.A * l2.C) / det;
-    return Point(x, y);
+Point intersection(const Line& line_1, const Line& line_2) {
+    double new_y =
+            (line_1.free_coeff * line_2.coeff_x -
+             line_2.free_coeff * line_1.coeff_x) /
+            (line_1.coeff_x * line_2.coeff_y - line_2.coeff_x * line_1.coeff_y);
+    double new_x =
+            ((-line_1.coeff_y * new_y - line_1.free_coeff) / line_1.coeff_x);
+    return Point(new_x, new_y);
 }
 
 class Shape {
 public:
-    virtual ~Shape() = default;
     virtual double perimeter() const = 0;
     virtual double area() const = 0;
-    virtual bool operator==(const Shape& other) const = 0;
-    bool operator!=(const Shape& other) const { return !(*this == other); }
-    virtual bool isCongruentTo(const Shape& other) = 0;
-    virtual bool isSimilarTo(const Shape& other) = 0;
-    virtual bool containsPoint(const Point& p) = 0;
+    virtual bool operator==(const Shape& another) const = 0;
+    virtual bool operator!=(const Shape& another) const = 0;
+    virtual bool isCongruentTo(const Shape& another) = 0;
+    virtual bool isSimilarTo(const Shape& another) = 0;
+    virtual bool containsPoint(const Point& point) = 0;
 
     virtual void rotate(const Point& center, double angle) = 0;
     virtual void reflect(const Point& center) = 0;
     virtual void reflect(const Line& axis) = 0;
-    virtual void scale(const Point& center, double coeff) = 0;
+    virtual void scale(const Point& center, double coefficient) = 0;
+
+    virtual ~Shape() = default;
 };
 
 class Polygon : public Shape {
-protected:
-    std::vector<Point> vertices_;
+private:
+    std::vector<Point> vertices;
 
 public:
-    Polygon(const std::vector<Point>& verts) : vertices_(verts) {}
+    Polygon(const std::vector<Point>& vert) : vertices(vert){};
+    template <class... Points>
+    Polygon(Points&&... points) : vertices{std::forward<Points>(points)...} {}
 
-    template<typename... Points>
-    Polygon(Points... points) : vertices_{points...} {}
+    Polygon(Polygon& P) : vertices(P.getVertices()){};
 
-    Polygon(const Polygon&) = default;
-    Polygon& operator=(const Polygon&) = default;
-
-    size_t verticesCount() const { return vertices_.size(); }
-    std::vector<Point> getVertices() const { return vertices_; }
+    Polygon& operator=(const Polygon& P) {
+        if (this != &P) {
+            vertices = P.vertices;
+        }
+        return *this;
+    }
 
     double perimeter() const override {
         double per = 0;
-        size_t n = verticesCount();
-        for (size_t i = 0; i < n; ++i)
-            per += length(vertices_[i], vertices_[(i+1)%n]);
+        for (size_t i = 0; i < verticesCount() - 1; ++i) {
+            per += length(vertices[i], vertices[i + 1]);
+        }
+        per += length(vertices[verticesCount() - 1], vertices[0]);
         return per;
     }
 
     double area() const override {
         double area = 0;
-        size_t n = verticesCount();
-        for (size_t i = 0; i < n; ++i)
-            area += vertices_[i].x * vertices_[(i+1)%n].y - vertices_[(i+1)%n].x * vertices_[i].y;
-        return std::abs(area) / 2;
+        for (size_t i = 0; i < verticesCount() - 1; ++i) {
+            area += vertices[i].x * vertices[i + 1].y;
+            area -= vertices[i].y * vertices[i + 1].x;
+        }
+        area += vertices[verticesCount() - 1].x * vertices[0].y;
+        area -= vertices[verticesCount() - 1].y * vertices[0].x;
+        return std::abs(area / 2);
     }
 
-    bool operator==(const Shape& other) const override {
-        auto poly = dynamic_cast<const Polygon*>(&other);
-        if (!poly || poly->verticesCount() != verticesCount()) return false;
-        const auto& v2 = poly->getVertices();
-        size_t n = verticesCount();
+    bool operator==(const Shape& another) const override {
+        auto polygon = dynamic_cast<const Polygon*>(&another);
+        if (polygon == nullptr || polygon->verticesCount() != verticesCount()) {
+            return false;
+        }
+        std::vector<Point> v1 = getVertices();
+        std::vector<Point> v2 = polygon->getVertices();
 
-        auto check = [&](size_t start, bool reverse) {
-            for (size_t i = 0; i < n; ++i) {
-                size_t j = reverse ? (start - i + n) % n : (start + i) % n;
-                if (vertices_[i] != v2[j]) return false;
-            }
-            return true;
-        };
-
-        for (size_t start = 0; start < n; ++start) {
-            if (vertices_[0] == v2[start]) {
-                if (check(start, false) || check(start, true))
-                    return true;
+        std::vector<size_t> poss;
+        for (size_t i = 0; i < v2.size(); ++i) {
+            if (v1[0] == v2[i]) {
+                poss.push_back(i);
             }
         }
+        if (poss.empty()) {
+            return false;
+        }
+
+        bool flag;
+        for (size_t i : poss) {
+            flag = true;
+            for (size_t j = 0; j < v1.size(); ++j) {
+                if (v1[j] != v2[(i + j) % v1.size()]) {
+                    flag = false;
+                    break;
+                }
+            }
+            if (flag) return true;
+        }
+
+        for (size_t i : poss) {
+            flag = true;
+            for (size_t j = 0; j < v1.size(); ++j) {
+                size_t k = (i - j + v1.size()) % v1.size();
+                if (v1[j] != v2[k]) {
+                    flag = false;
+                    break;
+                }
+            }
+            if (flag) return true;
+        }
+
         return false;
     }
 
-    bool isCongruentTo(const Shape& other) override {
-        // упрощённо: сравниваем длины сторон и углы (для выпуклых многоугольников)
-        auto poly = dynamic_cast<const Polygon*>(&other);
-        if (!poly || poly->verticesCount() != verticesCount()) return false;
-        auto sides1 = getSides();
-        auto sides2 = poly->getSides();
-        auto angles1 = getAngles();
-        auto angles2 = poly->getAngles();
-        size_t n = sides1.size();
+    bool operator!=(const Shape& another) const override {
+        return !(*this == another);
+    }
 
-        auto check = [&](size_t start, bool reverse) {
-            for (size_t i = 0; i < n; ++i) {
-                size_t j = reverse ? (start - i + n) % n : (start + i) % n;
-                if (!equal(sides1[i], sides2[j]) || !equal(angles1[i], angles2[j]))
-                    return false;
+    bool isCongruentTo(const Shape& another) override {
+        auto polygon = dynamic_cast<const Polygon*>(&another);
+        if (polygon == nullptr || polygon->verticesCount() != verticesCount()) {
+            return false;
+        }
+
+        std::vector<double> sides_1 = getSides();
+        std::vector<double> sides_2 = polygon->getSides();
+        std::vector<double> angles_1 = getAngles();
+        std::vector<double> angles_2 = polygon->getAngles();
+        size_t count = sides_1.size();
+        std::vector<size_t> poss;
+
+        for (size_t i = 0; i < count; ++i) {
+            if (equal(sides_1[0], sides_2[i])) {
+                poss.push_back(i);
             }
-            return true;
-        };
+        }
 
-        for (size_t start = 0; start < n; ++start) {
-            if (check(start, false) || check(start, true))
+        if (poss.empty()) {
+            return false;
+        }
+
+        for (size_t i : poss) {
+            bool flag = true;
+
+            for (size_t j = 0; j < count; ++j) {
+                if (!equal(angles_1[j], angles_2[(i + j) % count]) ||
+                    !equal(sides_1[j], sides_2[(i + j) % count])) {
+                    flag = false;
+                    break;
+                }
+            }
+
+            if (flag) {
                 return true;
+            }
         }
+
+        for (size_t i = 0; i < count; ++i) {
+            bool flag = true;
+
+            for (size_t j = 0; j < count; ++j) {
+                if (!equal(angles_1[j], angles_2[(i - j + count) % count]) ||
+                    !equal(sides_1[j], sides_2[(i - j + count - 1) % count])) {
+                    flag = false;
+                    break;
+                }
+            }
+
+            if (flag) {
+                return true;
+            }
+        }
+
         return false;
     }
 
-    bool isSimilarTo(const Shape& other) override {
-        auto poly = dynamic_cast<const Polygon*>(&other);
-        if (!poly || poly->verticesCount() != verticesCount()) return false;
-        auto sides1 = getSides();
-        auto sides2 = poly->getSides();
-        auto angles1 = getAngles();
-        auto angles2 = poly->getAngles();
-        size_t n = sides1.size();
+    bool isSimilarTo(const Shape& another) override {
+        auto polygon = dynamic_cast<const Polygon*>(&another);
+        if (polygon == nullptr || polygon->verticesCount() != verticesCount()) {
+            return false;
+        }
 
-        auto check = [&](size_t start, bool reverse) {
-            double ratio = sides1[0] / sides2[start];
-            for (size_t i = 0; i < n; ++i) {
-                size_t j = reverse ? (start - i + n) % n : (start + i) % n;
-                if (!equal(angles1[i], angles2[j]) || !equal(sides1[i], sides2[j] * ratio))
-                    return false;
-            }
-            return true;
-        };
+        std::vector<double> sides_1 = getSides();
+        std::vector<double> sides_2 = polygon->getSides();
+        std::vector<double> angles_1 = getAngles();
+        std::vector<double> angles_2 = polygon->getAngles();
+        size_t count = sides_1.size();
+        std::vector<size_t> poss;
 
-        for (size_t start = 0; start < n; ++start) {
-            if (equal(angles1[0], angles2[start])) {
-                if (check(start, false) || check(start, true))
-                    return true;
+        for (size_t i = 0; i < count; ++i) {
+            if (equal(angles_1[0], angles_2[i])) {
+                poss.push_back(i);
             }
         }
+        if (poss.empty()) {
+            return false;
+        }
+
+        for (size_t i : poss) {
+            bool flag = true;
+            double ratio = sides_1[0] / sides_2[i];
+
+            for (size_t j = 0; j < count; ++j) {
+                if (!equal(angles_1[j], angles_2[(i + j) % count]) ||
+                    !equal(ratio, sides_1[j] / sides_2[(i + j) % count])) {
+                    flag = false;
+                    break;
+                }
+            }
+
+            if (flag) {
+                return true;
+            }
+        }
+
+        for (size_t i = 0; i < count; ++i) {
+            bool flag = true;
+            double ratio = sides_1[0] / sides_2[(i + count - 1) % count];
+
+            for (size_t j = 0; j < count; ++j) {
+                if (!equal(angles_1[j], angles_2[(i - j + count) % count]) ||
+                    !equal(ratio, sides_1[j] / sides_2[(i - j + count - 1) % count])) {
+                    flag = false;
+                    break;
+                }
+            }
+
+            if (flag) {
+                return true;
+            }
+        }
+
         return false;
     }
 
-    bool containsPoint(const Point& p) override {
-        // ray casting algorithm
-        bool inside = false;
-        size_t n = verticesCount();
-        for (size_t i = 0, j = n-1; i < n; j = i++) {
-            if (((vertices_[i].y > p.y) != (vertices_[j].y > p.y)) &&
-                (p.x < (vertices_[j].x - vertices_[i].x) * (p.y - vertices_[i].y) / (vertices_[j].y - vertices_[i].y) + vertices_[i].x))
-                inside = !inside;
+    bool containsPoint(const Point& point) override {
+        size_t j = verticesCount() - 1;
+        bool flag = false;
+        for (size_t i = 0; i < verticesCount(); ++i) {
+            if ((vertices[i].y < point.y && vertices[j].y >= point.y) ||
+                (vertices[j].y < point.y && vertices[i].y >= point.y)) {
+                if (vertices[j].y != vertices[i].y) {
+                    double inter = vertices[i].x + (point.y - vertices[i].y) /
+                                                   (vertices[j].y - vertices[i].y) *
+                                                   (vertices[j].x - vertices[i].x);
+                    if (inter < point.x) {
+                        flag = !flag;
+                    }
+                }
+            }
+            j = i;
         }
-        return inside;
+        return flag;
     }
 
     void rotate(const Point& center, double angle) override {
-        for (auto& v : vertices_)
-            v = point_rotate(v, center, angle);
+        std::vector<Point> vert;
+        for (size_t i = 0; i < verticesCount(); ++i) {
+            double new_x = (vertices[i].x - center.x) * cos(angle) -
+                           (vertices[i].y - center.y) * sin(angle) + center.x;
+            double new_y = (vertices[i].x - center.x) * sin(angle) +
+                           (vertices[i].y - center.y) * cos(angle) + center.y;
+            vert.push_back(Point(new_x, new_y));
+        }
+        *this = Polygon(vert);
     }
 
     void reflect(const Point& center) override {
-        for (auto& v : vertices_)
-            v = Point(2*center.x - v.x, 2*center.y - v.y);
+        std::vector<Point> vert;
+        for (size_t i = 0; i < verticesCount(); ++i) {
+            double new_x = 2 * center.x - vertices[i].x;
+            double new_y = 2 * center.y - vertices[i].y;
+            vert.push_back(Point(new_x, new_y));
+        }
+        *this = Polygon(vert);
     }
 
     void reflect(const Line& axis) override {
-        for (auto& v : vertices_)
-            v = point_reflect(v, axis);
-    }
-
-    void scale(const Point& center, double coeff) override {
-        for (auto& v : vertices_)
-            v = Point(center.x + coeff*(v.x - center.x),
-                      center.y + coeff*(v.y - center.y));
-    }
-
-    bool isConvex() const {
-        size_t n = verticesCount();
-        if (n <= 3) return true;
-        int turn = 0;
-        for (size_t i = 0; i < n; ++i) {
-            const Point& a = vertices_[i];
-            const Point& b = vertices_[(i+1)%n];
-            const Point& c = vertices_[(i+2)%n];
-            double dx1 = b.x - a.x, dy1 = b.y - a.y;
-            double dx2 = c.x - b.x, dy2 = c.y - b.y;
-            int s = sign(dx1*dy2 - dy1*dx2);
-            if (turn == 0) turn = s;
-            else if (s * turn < 0) return false;
+        std::vector<Point> vert;
+        for (size_t i = 0; i < verticesCount(); ++i) {
+            vert.push_back(point_reflect(vertices[i], axis));
         }
-        return true;
+        *this = Polygon(vert);
     }
+
+    void scale(const Point& center, double coefficient) override {
+        std::vector<Point> vert;
+        for (size_t i = 0; i < verticesCount(); ++i) {
+            double new_x = center.x + coefficient * (vertices[i].x - center.x);
+            double new_y = center.y + coefficient * (vertices[i].y - center.y);
+            vert.push_back(Point(new_x, new_y));
+        }
+        *this = Polygon(vert);
+    }
+
+    size_t verticesCount() const { return vertices.size(); }
+
+    std::vector<Point> getVertices() const { return vertices; }
 
 private:
     std::vector<double> getSides() const {
-        std::vector<double> res;
-        size_t n = verticesCount();
-        for (size_t i = 0; i < n; ++i)
-            res.push_back(length(vertices_[i], vertices_[(i+1)%n]));
-        return res;
+        std::vector<double> sides;
+        for (size_t i = 0; i < verticesCount(); ++i) {
+            sides.push_back(length(vertices[i], vertices[(i + 1) % verticesCount()]));
+        }
+        return sides;
     }
 
     std::vector<double> getAngles() const {
-        std::vector<double> res;
-        size_t n = verticesCount();
-        for (size_t i = 0; i < n; ++i) {
-            const Point& a = vertices_[(i-1+n)%n];
-            const Point& b = vertices_[i];
-            const Point& c = vertices_[(i+1)%n];
-            res.push_back(angle(a, b, c));
+        std::vector<double> angles;
+        for (size_t i = 0; i < verticesCount(); ++i) {
+            angles.push_back(
+                    angle(vertices[(i - 1 + verticesCount()) % verticesCount()],
+                          vertices[i], vertices[(i + 1) % verticesCount()]));
         }
-        return res;
+        return angles;
+    }
+
+public:
+    bool isConvex() {
+        if (verticesCount() <= 3) {
+            return true;
+        }
+        int flag = true;
+        double turn_sign = 0;
+        std::vector<Point> new_vert = vertices;
+        new_vert.push_back(vertices[0]);
+        new_vert.push_back(vertices[1]);
+        for (size_t i = 0; i < new_vert.size() - 2; ++i) {
+            double AB_x = new_vert[i + 1].x - new_vert[i].x;
+            double AB_y = new_vert[i + 1].y - new_vert[i].y;
+            double BC_x = new_vert[i + 2].x - new_vert[i + 1].x;
+            double BC_y = new_vert[i + 2].y - new_vert[i + 1].y;
+            if (turn_sign == 0) {
+                turn_sign = sign(AB_x * BC_y - AB_y * BC_x);
+            } else {
+                if (sign(AB_x * BC_y - AB_y * BC_x) * turn_sign < 0) {
+                    flag = false;
+                    break;
+                }
+            }
+        }
+
+        return flag;
     }
 };
 
 class Ellipse : public Shape {
-protected:
-    Point f1_, f2_;
-    double dist_sum_; // сумма расстояний до фокусов = 2a
-    double a_; // большая полуось
-    double b_; // малая полуось
-    double c_; // расстояние от центра до фокуса
-
-    void compute_axes() {
-        a_ = dist_sum_ / 2;
-        c_ = length(f1_, f2_) / 2;
-        b_ = std::sqrt(a_*a_ - c_*c_);
-    }
+private:
+    Point focus_1;
+    Point focus_2;
+    double sum_dist;
+    double big_semi_axis = sum_dist / 2;
+    double focus_dist =
+            sqrt(pow(focus_2.x - focus_1.x, 2) + pow(focus_2.y - focus_1.y, 2)) / 2;
+    double small_semi_axis = sqrt(pow(big_semi_axis, 2) - pow(focus_dist, 2));
 
 public:
-    Ellipse(const Point& f1, const Point& f2, double sum_dist)
-        : f1_(f1), f2_(f2), dist_sum_(sum_dist) {
-        compute_axes();
-    }
-
-    std::pair<Point, Point> focuses() const { return {f1_, f2_}; }
-    double eccentricity() const { return c_ / a_; }
-    Point center() const { return mid(f1_, f2_); }
+    Ellipse(const Point& focus_1, const Point& focus_2, double sum_dist)
+            : focus_1(focus_1), focus_2(focus_2), sum_dist(sum_dist){};
 
     double perimeter() const override {
-        // приближённая формула Рамануджана
-        return pi * (3*(a_+b_) - std::sqrt((3*a_+b_)*(a_+3*b_)));
+        return pi * (3 * (big_semi_axis + small_semi_axis) -
+                     sqrt((3 * big_semi_axis + small_semi_axis) *
+                          (big_semi_axis + 3 * small_semi_axis)));
     }
 
-    double area() const override { return pi * a_ * b_; }
+    double area() const override { return pi * big_semi_axis * small_semi_axis; }
 
-    bool operator==(const Shape& other) const override {
-        auto e = dynamic_cast<const Ellipse*>(&other);
-        if (!e) return false;
-        return (f1_ == e->f1_ && f2_ == e->f2_ && equal(dist_sum_, e->dist_sum_)) ||
-               (f1_ == e->f2_ && f2_ == e->f1_ && equal(dist_sum_, e->dist_sum_));
+    bool operator==(const Shape& another) const override {
+        auto ellipse = dynamic_cast<const Ellipse*>(&another);
+        if ((ellipse == nullptr) ||
+            !((((focus_1 == ellipse->focus_1) && (focus_2 == ellipse->focus_2)) ||
+               ((focus_1 == ellipse->focus_2) && (focus_2 == ellipse->focus_1))) &&
+              (sum_dist == ellipse->sum_dist))) {
+            return false;
+        }
+        return true;
     }
 
-    bool isCongruentTo(const Shape& other) override {
-        auto e = dynamic_cast<const Ellipse*>(&other);
-        if (!e) return false;
-        return equal(length(f1_, f2_), length(e->f1_, e->f2_)) &&
-               equal(dist_sum_, e->dist_sum_);
+    bool operator!=(const Shape& another) const override {
+        return !(*this == another);
     }
 
-    bool isSimilarTo(const Shape& other) override {
-        auto e = dynamic_cast<const Ellipse*>(&other);
-        if (!e) return false;
-        double ratio1 = a_ / b_;
-        double ratio2 = e->a_ / e->b_;
-        return equal(ratio1, ratio2) || equal(ratio1, 1.0/ratio2);
+    bool isCongruentTo(const Shape& another) override {
+        auto ellipse = dynamic_cast<const Ellipse*>(&another);
+        return !((ellipse == nullptr) ||
+                 (!equal(length(focus_1, focus_2),
+                         length(ellipse->focus_1, ellipse->focus_2)) &&
+                  (sum_dist == ellipse->sum_dist)));
     }
 
-    bool containsPoint(const Point& p) override {
-        double d1 = length(p, f1_);
-        double d2 = length(p, f2_);
-        return d1 + d2 <= dist_sum_ + 1e-9;
+    bool isSimilarTo(const Shape& another) override {
+        auto ellipse = dynamic_cast<const Ellipse*>(&another);
+        return !(ellipse == nullptr ||
+                 !(big_semi_axis / small_semi_axis ==
+                   ellipse->big_semi_axis / ellipse->small_semi_axis ||
+                   big_semi_axis / small_semi_axis ==
+                   ellipse->small_semi_axis / ellipse->big_semi_axis));
+    }
+
+    bool containsPoint(const Point& point) override {
+        Point cent = mid(focus_1, focus_2);
+        double new_x = point.x - cent.x;
+        double new_y = point.y - cent.y;
+        if ((new_x * new_x) / (big_semi_axis * big_semi_axis) +
+            (new_y * new_y) / (small_semi_axis * small_semi_axis) <=
+            1) {
+            return true;
+        }
+        return false;
     }
 
     void rotate(const Point& center, double angle) override {
-        f1_ = point_rotate(f1_, center, angle);
-        f2_ = point_rotate(f2_, center, angle);
-        compute_axes();
+        focus_1 = point_rotate(focus_1, center, angle);
+        focus_2 = point_rotate(focus_2, center, angle);
     }
 
     void reflect(const Point& center) override {
-        f1_ = Point(2*center.x - f1_.x, 2*center.y - f1_.y);
-        f2_ = Point(2*center.x - f2_.x, 2*center.y - f2_.y);
-        compute_axes();
+        focus_1 = Point(2 * center.x - focus_1.x, 2 * center.y - focus_1.y);
+        focus_2 = Point(2 * center.x - focus_2.x, 2 * center.y - focus_2.y);
     }
 
     void reflect(const Line& axis) override {
-        f1_ = point_reflect(f1_, axis);
-        f2_ = point_reflect(f2_, axis);
-        compute_axes();
+        focus_1 = point_reflect(focus_1, axis);
+        focus_2 = point_reflect(focus_2, axis);
     }
 
-    void scale(const Point& center, double coeff) override {
-        f1_ = Point(center.x + coeff*(f1_.x - center.x),
-                    center.y + coeff*(f1_.y - center.y));
-        f2_ = Point(center.x + coeff*(f2_.x - center.x),
-                    center.y + coeff*(f2_.y - center.y));
-        dist_sum_ *= coeff;
-        compute_axes();
+    void scale(const Point& center, double coefficient) override {
+        double new_x1 = center.x + coefficient * (focus_1.x - center.x);
+        double new_y1 = center.y + coefficient * (focus_1.y - center.y);
+
+        double new_x2 = center.x + coefficient * (focus_2.x - center.x);
+        double new_y2 = center.y + coefficient * (focus_2.y - center.y);
+
+        *this = Ellipse(Point(new_x1, new_y1), Point(new_x2, new_y2),
+                        sum_dist * coefficient);
+    }
+
+    std::pair<Point, Point> focuses() { return std::pair{focus_1, focus_2}; }
+
+    std::pair<Line, Line> directrices() {
+        Line axis = Line(focus_1, focus_2);
+        Point cent = mid(focus_1, focus_2);
+        if (axis.coeff_y != 0) {
+            double k = -axis.coeff_x / axis.coeff_y;
+            double q = -axis.free_coeff / axis.coeff_y;
+            double dis =
+                    pow((-2 * cent.x - 2 * k * cent.y + 2 * k * q), 2) -
+                    4 * (1 + pow(k, 2)) *
+                    (pow(cent.x, 2) + pow(cent.y, 2) + pow(q, 2) - 2 * q * cent.y -
+                     pow(big_semi_axis, 2) / eccentricity());
+            double x1 = (-(-2 * cent.x - 2 * k * cent.y + 2 * k * q) + sqrt(dis)) / 4;
+            double x2 = (-(-2 * cent.x - 2 * k * cent.y + 2 * k * q) - sqrt(dis)) / 4;
+            double y1 = k * x1 + q;
+            double y2 = k * x2 + q;
+            return {Line(Point(x1, y1), -1.0 / k), Line(Point(x2, y2), -1.0 / k)};
+        } else {
+            double x1 = focus_1.x;
+            double x2 = x1;
+            double y1 = focus_1.x + eccentricity();
+            double y2 = focus_2.x - eccentricity();
+            return {Line(Point(x1, y1), Point(x1 + 1, y1)),
+                    Line(Point(x2, y2), Point(x2 + 1, y2))};
+        }
+    }
+
+    double eccentricity() const { return focus_dist / big_semi_axis; }
+
+    Point center() const {
+        return Point((focus_1.x + focus_2.x) / 2, (focus_1.y + focus_2.y) / 2);
     }
 };
 
 class Circle : public Ellipse {
+private:
+    Point circ_center;
+    double circ_radius;
+
 public:
+    bool operator==(const Shape& another) const override {
+        auto circle = dynamic_cast<const Circle*>(&another);
+        if ((circle == nullptr) ||
+            !((circ_center==circle->circ_center) && equal(circ_radius, circle->circ_radius))) {
+            return false;
+        }
+        return true;
+    }
+
+    double radius() const { return circ_radius; }
+
+    double perimeter() const override { return pi * 2 * circ_radius; }
+
+    double area() const override { return pi * pow(circ_radius, 2); }
+
+    void scale(const Point& center, double coefficient) override {
+        double new_x = center.x + coefficient * (center.x - center.x);
+        double new_y = center.y + coefficient * (center.y - center.y);
+
+        *this = Circle(Point(new_x, new_y), circ_radius * coefficient);
+    }
+
     Circle(const Point& center, double radius)
-        : Ellipse(center, center, 2*radius) {}
-
-    double radius() const { return a_; }
-
-    double perimeter() const override { return 2 * pi * radius(); }
-    double area() const override { return pi * radius() * radius(); }
-
-    bool operator==(const Shape& other) const override {
-        auto c = dynamic_cast<const Circle*>(&other);
-        if (!c) return false;
-        return center() == c->center() && equal(radius(), c->radius());
-    }
-
-    void scale(const Point& center, double coeff) override {
-        Ellipse::scale(center, coeff);
-        // остаётся окружностью, так как фокусы совпадают
-    }
+            : Ellipse(center, center, 2 * radius),
+              circ_center(center),
+              circ_radius(radius){};
 };
 
 class Rectangle : public Polygon {
-public:
-    Rectangle(const Point& A, const Point& C, double ratio) : Polygon(computeVertices(A, C, ratio)) {}
-
-    Point center() const {
-        auto v = getVertices();
-        return mid(v[0], v[2]);
-    }
-
-    std::pair<Line, Line> diagonals() const {
-        auto v = getVertices();
-        return {Line(v[0], v[2]), Line(v[1], v[3])};
-    }
-
 private:
-    static std::vector<Point> computeVertices(const Point& A, const Point& C, double ratio) {
-        double w = ratio; // отношение смежных сторон (большая/меньшая)
+    std::vector<Point> vertices;
+    std::vector<Point> get_verts(const Point& A, const Point& C, double ratio) {
+        if (ratio < 1) {
+            ratio = 1.0 / ratio;
+        }
         double diag = length(A, C);
-        double h = std::sqrt(diag*diag / (1 + w*w));
-        double w_side = w * h;
+        double s2 = std::sqrt((diag * diag) / (1.0 + ratio * ratio));
 
-        // вектор диагонали
-        double dx = C.x - A.x;
-        double dy = C.y - A.y;
-        double len = std::sqrt(dx*dx + dy*dy);
-        dx /= len; dy /= len;
+        double vx = C.x - A.x;
+        double vy = C.y - A.y;
 
-        // перпендикуляр
-        double nx = -dy;
-        double ny = dx;
+        double len = std::sqrt(vx * vx + vy * vy);
+        vx /= len;
+        vy /= len;
 
-        // ориентация: короткая сторона слева от диагонали
-        double dp = dot_product(dx, dy, ny, -nx);
-        if (dp < 0) { nx = -nx; ny = -ny; }
+        double nx = -vy;
+        double ny = vx;
 
-        Point B(A.x + nx * h, A.y + ny * h);
-        Point D(2*mid(A,C).x - B.x, 2*mid(A,C).y - B.y);
+        double dp = dot_product(vx, vy, ny, -nx);
+        if (dp < 0) {
+            nx = -nx;
+            ny = -ny;
+        }
+
+        Point B = {A.x + nx * s2, A.y + ny * s2};
+        Point M = mid(A, C);
+        Point D = {2 * M.x - B.x, 2 * M.y - B.y};
+
         return {A, B, C, D};
+    }
+
+public:
+    Rectangle(const Point& A, const Point& C, double x)
+            : Polygon(get_verts(A, C, x)) {}
+
+    Point center() {
+        return Point((vertices[0].x + vertices[2].x) / 2,
+                     (vertices[0].y + vertices[2].y) / 2);
+    }
+
+    std::pair<Line, Line> diagonals() {
+        return {Line(vertices[0], vertices[2]), Line(vertices[1], vertices[3])};
     }
 };
 
 class Square : public Rectangle {
-public:
-    Square(const Point& A, const Point& C) : Rectangle(A, C, 1.0) {}
+private:
+    std::vector<Point> vertices = getVertices();
 
-    Circle circumscribedCircle() const {
-        auto v = getVertices();
-        double r = length(v[0], v[2]) / 2;
-        return Circle(center(), r);
+public:
+    Square(const Point& p_1, const Point& p_2) : Rectangle(p_1, p_2, 1){};
+
+    Circle circumscribedCircle() {
+        Point A = vertices[0];
+        Point C = vertices[2];
+        double rad = length(A, C) / 2;
+        return Circle(center(), rad);
     }
 
-    Circle inscribedCircle() const {
-        auto v = getVertices();
-        double r = length(v[0], v[1]) / 2;
-        return Circle(center(), r);
+    Circle inscribedCircle() {
+        Point p_1 = vertices[0];
+        Point p_2 = vertices[1];
+        double rad = length(p_1, p_2) / 2;
+        return Circle(center(), rad);
     }
 };
 
 class Triangle : public Polygon {
+private:
+    std::vector<Point> vertices = getVertices();
+
+    Point point_1 = vertices[0];
+    Point point_2 = vertices[1];
+    Point point_3 = vertices[2];
+
+    double side_12 = length(point_1, point_2);
+    double side_23 = length(point_2, point_3);
+    double side_13 = length(point_3, point_1);
+
 public:
-    Triangle(const Point& A, const Point& B, const Point& C) : Polygon(A, B, C) {}
+    Triangle(const Point& point_1, const Point& point_2, const Point& point_3)
+            : Polygon(point_1, point_2, point_3){};
 
-    Circle circumscribedCircle() const {
-        auto v = getVertices();
-        double a = length(v[1], v[2]);
-        double b = length(v[0], v[2]);
-        double c = length(v[0], v[1]);
-        double R = (a * b * c) / (4 * area());
-
-        // центр описанной окружности — пересечение серединных перпендикуляров
-        Line s1 = Line(v[0], v[1]);
-        Line s2 = Line(v[1], v[2]);
-        Point m1 = mid(v[0], v[1]);
-        Point m2 = mid(v[1], v[2]);
-        Line p1(-s1.B, s1.A, s1.B*m1.x - s1.A*m1.y);
-        Line p2(-s2.B, s2.A, s2.B*m2.x - s2.A*m2.y);
-        Point O = intersection(p1, p2);
-        return Circle(O, R);
+    Circle circumscribedCircle() {
+        double rad = (side_23 * side_13 * side_12) / (4 * area());
+        Point mid_12 = mid(point_1, point_2);
+        Line s_12 = Line(point_1, point_2);
+        Point mid_23 = mid(point_2, point_3);
+        Line s_23 = Line(point_2, point_3);
+        Line p_12 = Line(s_12.coeff_y, -s_12.coeff_x,
+                         s_12.coeff_x * mid_12.y - s_12.coeff_y * mid_12.x);
+        Line p_23 = Line(s_23.coeff_y, -s_23.coeff_x,
+                         s_23.coeff_x * mid_23.y - s_23.coeff_y * mid_23.x);
+        Point O = intersection(p_12, p_23);
+        return Circle(O, rad);
     }
 
-    Circle inscribedCircle() const {
-        auto v = getVertices();
-        double a = length(v[1], v[2]);
-        double b = length(v[0], v[2]);
-        double c = length(v[0], v[1]);
-        double p = (a + b + c) / 2;
-        double r = area() / p;
+    Circle inscribedCircle() {
+        double rad = (2 * area()) / (side_23 + side_13 + side_12);
 
-        double x = (a*v[0].x + b*v[1].x + c*v[2].x) / (a+b+c);
-        double y = (a*v[0].y + b*v[1].y + c*v[2].y) / (a+b+c);
-        return Circle(Point(x, y), r);
+        double cent_x =
+                (side_23 * point_1.x + side_13 * point_2.x + side_12 * point_3.x) /
+                Polygon::perimeter();
+        double cent_y =
+                (side_23 * point_1.y + side_13 * point_2.y + side_12 * point_3.y) /
+                Polygon::perimeter();
+        return Circle(Point(cent_x, cent_y), rad);
     }
 
     Point centroid() const {
-        auto v = getVertices();
-        return Point((v[0].x + v[1].x + v[2].x)/3,
-                     (v[0].y + v[1].y + v[2].y)/3);
+        return Point((point_1.x + point_2.x + point_3.x) / 3,
+                     (point_1.y + point_2.y + point_3.y) / 3);
     }
 
-    Point orthocenter() const {
-        auto v = getVertices();
-        Line ab(v[0], v[1]);
-        Line bc(v[1], v[2]);
-        Line ha(-ab.B, ab.A, ab.B*v[2].x - ab.A*v[2].y);
-        Line hb(-bc.B, bc.A, bc.B*v[0].x - bc.A*v[0].y);
-        return intersection(ha, hb);
+    Point orthocenter() {
+        Line ab = Line(point_1, point_2);
+        Line h_a = Line(-ab.coeff_y, ab.coeff_x,
+                        ab.coeff_y * point_3.x - ab.coeff_x * point_3.y);
+        Line bc = Line(point_2, point_3);
+        Line h_b = Line(-bc.coeff_y, bc.coeff_x,
+                        bc.coeff_y * point_1.x - bc.coeff_x * point_1.y);
+        return intersection(h_a, h_b);
     }
 
-    Line EulerLine() const {
-        return Line(centroid(), orthocenter());
-    }
+    Line EulerLine() { return Line(centroid(), orthocenter()); }
 
-    Circle ninePointsCircle() const {
-        auto v = getVertices();
-        Point m1 = mid(v[0], v[1]);
-        Point m2 = mid(v[1], v[2]);
-        Point m3 = mid(v[2], v[0]);
-        return Triangle(m1, m2, m3).circumscribedCircle();
+    Circle ninePointsCircle() {
+        return Triangle(mid(point_1, point_2), mid(point_2, point_3),
+                        mid(point_3, point_1))
+                .circumscribedCircle();
     }
 };
-
-#endif // GEOMETRY_HPP
